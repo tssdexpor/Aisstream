@@ -1,5 +1,5 @@
 {
-  "name": "aisstream.io",
+  "name": "aisstream.io_export",
   "version": "1.0.0",
   "main": "server.js",
   "dependencies": {

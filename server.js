@@ -34,7 +34,7 @@ app.get("/ship", async (req, res) => {
 
   ws.on("open", () => {
     const subscription = {
-      Apikey: "05c8f44f515a484d7e3a8f5bf42ba02a03018622",
+      APIkey: "05c8f44f515a484d7e3a8f5bf42ba02a03018622",
       BoundingBoxes: [[[-170, -60], [-30, 80]]]
     };
 

@@ -60,9 +60,9 @@ app.get("/ship", async (req, res) => {
     if (!responded) {
       responded = true;
       ws.close();
-      res.status(504).send("Timeout sin datos AIS (15s sin mensajes)");
+      res.status(504).send("Timeout sin datos AIS (25s sin mensajes)");
     }
-  }, 15000);
+  }, 25000);
 });
 
 const PORT = process.env.PORT || 3000;

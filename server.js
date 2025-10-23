@@ -3,85 +3,47 @@ const WebSocket = require("ws");
 
 const app = express();
 
-// ✅ Nuevo endpoint /ping para testear el servidor y token
-app.get("/ping", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "Servidor activo en Render y listo para recibir solicitudes.",
-    region: "América (bounding box -170/-60/-30/80)",
-    timeout: "15s",
-    websocket: "wss://stream.aisstream.io/v0/stream",
-    note: "Usar /ship?mmsi=xxxxxx o /ship?imo=xxxxxx para obtener datos AIS en tiempo real."
-  });
-});
-
-// ✅ Endpoint principal para consultar barcos
-app.get("/ship", async (req, res) => {
-  const imo = req.query.imo ? parseInt(req.query.imo) : null;
+app.get("/ship", (req, res) => {
   const mmsi = req.query.mmsi ? parseInt(req.query.mmsi) : null;
+  if (!mmsi) return res.status(400).send("Falta ?mmsi=");
 
-  if (!imo && !mmsi) {
-    return res.status(400).send("Falta el parámetro ?imo=XXXX o ?mmsi=XXXX");
-  }
+  const ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
 
-  const ws = new WebSocket("wss://stream.aisstream.io/v0/stream", {
-    headers: {
-      Authorization: "Bearer 05c8f44f515a484d7e3a8f5bf42ba02a03018622"
-    }
-  });
-
-  let responded = false;
+  let done = false;
 
   ws.on("open", () => {
-    const subscription = {
-      APIkey: "05c8f44f515a484d7e3a8f5bf42ba02a03018622",
-      BoundingBoxes: [[[-170, -60], [-30, 80]]]
+    const sub = {
+      APIKey: "05c8f44f515a484d7e3a8f5bf42ba02a03018622",
+      BoundingBoxes: [[[ -180, -90 ], [ 180, 90 ]]],
+      FiltersShipMMSI: [mmsi],
+      FilterMessageTypes: ["PositionReport"]
     };
-
-    // Filtro según parámetro recibido
-    if (mmsi) {
-      subscription.FiltersShipMMSI = [mmsi];
-    } else if (imo) {
-      subscription.FiltersImoNumber = [imo];
-    }
-
-    console.log("🛰️  Suscripción enviada:", subscription);
-    ws.send(JSON.stringify(subscription));
+    console.log("Suscripción enviada:", sub);
+    ws.send(JSON.stringify(sub));
   });
 
-  ws.on("message", (data) => {
+  ws.on("message", data => {
+    if (done) return;
     try {
-      const json = JSON.parse(data);
-      if (json.Ship && !responded) {
-        responded = true;
+      const msg = JSON.parse(data);
+      if (msg.MetaData && msg.Message) {
+        done = true;
         ws.close();
-        console.log("✅ Mensaje AIS recibido");
-        res.json(json);
+        return res.json(msg);
       }
-    } catch (err) {
-      console.error("Error parseando mensaje:", err);
+    } catch (e) {
+      console.error(e);
     }
   });
 
-  ws.on("error", (err) => {
-    if (!responded) {
-      responded = true;
-      console.error("❌ Error WebSocket:", err.message);
-      res.status(500).send("Error al conectar al stream: " + err.message);
-    }
-  });
-
-  // Timeout de 15 segundos
   setTimeout(() => {
-    if (!responded) {
-      responded = true;
+    if (!done) {
+      done = true;
       ws.close();
-      console.warn("⏱️ Timeout sin datos AIS (15s sin mensajes)");
-      res.status(504).send("Timeout sin datos AIS (15s sin mensajes)");
+      res.status(504).send("Timeout sin datos AIS");
     }
   }, 15000);
 });
 
-// ✅ Arranque del servidor HTTP
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Servidor escuchando en puerto " + PORT));
+app.listen(PORT, () => console.log("Servidor escuchando en puerto", PORT));
